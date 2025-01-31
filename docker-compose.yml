@@ -1,0 +1,75 @@
+services:
+  backend:
+    container_name: backend
+    restart: always
+    build:
+      context: ./formulaire-docker-api
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    env_file:
+      - ./formulaire-docker-api/.env.prod
+    environment:
+      - DB_HOST=mariadb_prod
+      - DB_PORT=3306
+      - DB_USER=root
+      - DB_PASSWORD=rootpassword
+      - DB_NAME=formulaire-docker
+      - PORT=5000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 10s
+    depends_on:
+      - mariadb_prod
+    networks:
+      - app-network
+  frontend:
+    container_name: frontend
+    restart: always
+    build:
+      context: ./formulaire-docker-ui
+      dockerfile: Dockerfile
+    ports:
+      - "8080:80"
+    expose:
+      - 8080
+    env_file:
+      - ./formulaire-docker-ui/.env.prod
+    environment:
+      - VITE_API_URL=http://backend:5000
+    depends_on:
+      - backend
+    networks:
+      - app-network
+  mariadb_prod:
+    image: mariadb:latest
+    container_name: mariadb_prod
+    restart: always
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: formulaire-docker
+      MYSQL_USER: root
+      MYSQL_PASSWORD: rootpassword
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./formulaire-docker-api/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      retries: 5
+      start_period: 10s
+      timeout: 10s
+
+volumes:
+  mariadb_data:
+
+networks:
+  app-network:
+    driver: bridge
